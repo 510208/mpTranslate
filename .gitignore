@@ -1,0 +1,6 @@
+*.yml
+*.json
+
+/output/*.yml
+/output/*.json
+/output
