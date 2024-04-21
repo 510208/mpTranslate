@@ -26,7 +26,7 @@ ASCII_LOGO = r"""
 # 初始化日志
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s][%(name)s][%(levelname)s] %(message)s')
 
-# 逐行書出ASCII LOGO
+# 逐行輸出ASCII LOGO
 for line in ASCII_LOGO.split('\n'):
     logging.info(line)
 logging.info('Minecraft 模組語言文件翻譯工具')
