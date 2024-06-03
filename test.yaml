@@ -1,0 +1,15 @@
+key1: "I am Samhacker"
+key2: "I am Samhacker"
+
+key_have_formater: "&3I am &r&lSamhacker"
+key_have_formater2: "&3I am &r&lSamhacker"
+key_have_formater3: "&3I am &r&lSamhacker"
+key_have_formater4: "&3I am &r&lSamhacker"
+
+lists:
+- "I am &r&lSamhacker"
+- "I am &r&lSamhacker"
+- "I am &r&lSamhacker"
+- "I am &r&lSamhacker"
+
+# Path: test.yaml
