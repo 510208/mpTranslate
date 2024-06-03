@@ -2,7 +2,6 @@ import os
 import sys
 from googletrans import Translator
 import argparse
-import json
 import yaml
 import logging
 import tqdm
@@ -58,11 +57,6 @@ parser = argparse.ArgumentParser(description='翻譯 Minecraft 模組的語言�
 parser.add_argument('--about', help='顯示作者資訊', action='store_true')
 # 定義版本，顯示版本資訊
 parser.add_argument('--ver', action='version', version='%(prog)s 0.1')
-# 參數二選一：
-# --json [路徑] 或 --yaml [路徑]
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument('--json', help='輸入文件為 JSON 格式')
-group.add_argument('--yaml', help='輸入文件為 YAML 格式')
 # 參數二選一，預設為--en2zt：
 # --en2zt 或 --zs2zt
 group2 = parser.add_mutually_exclusive_group(required=True)
@@ -113,10 +107,7 @@ if args.log:
 # -----------
 logging.info(f'讀取文件：{input_file_path}')
 with open(input_file_path, 'r', encoding='utf-8') as f:
-    if args.json:
-        data = json.load(f)
-    elif args.yaml:
-        data = yaml.safe_load(f)
+    data = yaml.safe_load(f)
 
 # -----------
 # 翻譯
@@ -180,11 +171,8 @@ for key, value in tqdm.tqdm(data.items()):
 # 寫入文件
 logging.info(f'寫入文件：{output_file_path}')
 with open(output_file_path, 'w', encoding='utf-8') as f:
-    if args.json:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    elif args.yaml:
-        # 寫入時要保留原本的註解
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+    # 寫入時要保留原本的註解
+    yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
 logging.info('翻譯完成！')
 sys.exit(0)
