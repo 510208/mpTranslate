@@ -7,6 +7,8 @@ import logging
 import tqdm
 from opencc import OpenCC
 import re
+import translater
+import simpcc
 
 VERSION = '0.1'
 ASCII_LOGO = r"""
@@ -57,11 +59,8 @@ parser = argparse.ArgumentParser(description='翻譯 Minecraft 模組的語言�
 parser.add_argument('--about', help='顯示作者資訊', action='store_true')
 # 定義版本，顯示版本資訊
 parser.add_argument('--ver', action='version', version='%(prog)s 0.1')
-# 參數二選一，預設為--en2zt：
-# --en2zt 或 --zs2zt
-group2 = parser.add_mutually_exclusive_group(required=True)
-group2.add_argument('--en2zt', help='由英文翻譯為繁體中文', action='store_true')
-group2.add_argument('--zs2zt', help='由簡體中文翻譯為繁體中文', action='store_true')
+# 強制性參數： --yaml [路徑]
+parser.add_argument('--yaml', help='輸入文件的路徑', required=True)
 # 選擇性參數： --output [路徑]
 parser.add_argument('--output', help='輸出文件的路徑，默認為 output/ 資料夾下的輸入文件名稱')
 # 選擇性參數： Log檔案路徑
@@ -88,91 +87,73 @@ args = parser.parse_args()
 # 處理參數
 # -----------
 
-# 輸入文件路徑
-input_file_path = args.json if args.json else args.yaml
+# 處理輸入參數
+impath = args.yaml
+# 處理輸出參數
+if args.output is None:
+    opath = os.path.join('output', os.path.basename(impath))
+else:
+    opath = args.output
 
-# 輸出文件路徑：默認為 output/ 資料夾下的輸入文件名稱，如果有指定 --output 參數，則使用指定的路徑
-output_file_path = args.output if args.output else f'output/{input_file_path.split("/")[-1]}'
+# 處理Log參數
+if args.log is None:
+    logpath = os.path.join('log', os.path.basename(impath) + '.log')
+else:
+    logpath = args.log
 
-# Log檔案路徑：如果有指定 --log 參數，則使用指定的路徑，否則直接顯示到終端
-# 初始化日誌
-if args.log:
-    logging.info(f'設定輸出檔案，並不再繼續顯示：\n{args.log}')
-    log_file_path = args.log if args.log else f'log/{input_file_path.split("/")[-1]}.log'
-    logging.basicConfig(filename=log_file_path)
-
-
-# -----------
-# 讀取文件
-# -----------
-logging.info(f'讀取文件：{input_file_path}')
-with open(input_file_path, 'r', encoding='utf-8') as f:
-    data = yaml.safe_load(f)
+# 輸出參數信息
+logging.info(f'輸入文件：{impath}')
+logging.info(f'輸出文件：{opath}')
+logging.info(f'Log文件：{logpath}')
 
 # -----------
-# 翻譯
-# -----------
-# 初始化翻譯器，使其偵測原始語言並只翻譯成繁體中文
-translator = Translator()
-translator.raise_Exception = True
-translator.detect_language = True
-translator.from_lang = 'auto'
-translator.to_lang = 'zh-tw'
-
-# 初始化OpenCC
-cc = OpenCC('s2t')
-
 # 開始翻譯
-logging.info('開始翻譯...')
-def translate(item):
-    if isinstance(item, dict):
-        return {k: translate(v) for k, v in item.items()}
-    elif isinstance(item, list):
-        return [translate(element) for element in item]
-    elif isinstance(item, str):
-        if item.strip():  # 檢查 item 是否為空
-            # 使用正則表達式找到 placeholder，並將其暫時替換為特殊標記
-            placeholders = re.findall(r'%\w+%', item)
-            placeholder_map = {ph: ph for ph in placeholders}  # 使用原始名稱作為 map 的值
-            item_temp = item
-            for ph, ph_temp in placeholder_map.items():
-                item_temp = item_temp.replace(ph, ph_temp)
-            # 進行翻譯
-            try:
-                translated_text = translator.translate(item_temp, dest='zh-tw').text
-            except Exception as e:
-                logging.error(f"Error translating text: {e}")
-                translated_text = item
-            # 將翻譯的文本中的 placeholder 還原回來
-            for ph, ph_temp in placeholder_map.items():
-                translated_text = translated_text.replace(ph_temp, ph)
-            return translated_text
-        else:
-            return item
+# -----------
+
+# 讀取yaml文件
+with open(impath, 'r', encoding='utf-8') as f:
+    content = yaml.load(f, Loader=yaml.FullLoader)
+
+# simpcc.convert用以轉換繁簡中文
+# translater.translate用以翻譯英文
+
+# 遍覽content，對每個value進行翻譯
+for key, value in content.items():
+    # 檢查value是否是字典
+    if isinstance(value, dict):
+        # 對字典中的每個值進行翻譯
+        for k, v in value.items():
+            # 檢查v的類型
+            if isinstance(v, str):
+                # 如果v是字符串，就檢查她是簡體中文還是英文
+                # 如果是簡體中文，就轉換為繁體中文
+                # 如果包含簡體中文，就視為簡體中文
+                if re.search(r'[\u4e00-\u9fa5]', v):
+                    logging.info(f'鍵{key}的值{v}是簡體中文')
+                    content[key][k] = simpcc.convert(v)
+                else:
+                    logging.info(f'鍵{key}的值{v}是英文')
+                    content[key][k] = translater.translate(v)
+            elif isinstance(v, list):
+                # 如果v是陣列，就調用parse_array
+                content[key][k] = translater.parse_array(v)
+            elif v is None:
+                # 如果v是None，就直接返回None
+                content[key][k] = None
+            else:
+                # 如果v不是字符串，也不是陣列，就直接傳回v
+                content[key][k] = v
+    elif isinstance(value, list):
+        # 如果value是陣列，就調用parse_array
+        content[key] = translater.parse_array(value)
+    elif value is None:
+        # 如果value是None，就直接返回None
+        content[key] = None
     else:
-        return item
+        # 如果value不是字典，也不是陣列，就直接傳回value
+        content[key] = value
 
-for key, value in tqdm.tqdm(data.items()):
-    # 翻譯
-    try:
-        if args.en2zt:
-            data[key] = translate(value)
-        elif args.zs2zt:
-            data[key] = cc.convert(value)
-    except Exception as e:
-        logging.error(f'翻譯失敗：{key} - {value}')
-        logging.error(e)
-
-# -----------
-# 寫入文件
-# -----------
-# 先檢查目標檔案是否存在，否的話就建立該檔案，是的話就繼續
-
-# 寫入文件
-logging.info(f'寫入文件：{output_file_path}')
-with open(output_file_path, 'w', encoding='utf-8') as f:
-    # 寫入時要保留原本的註解
-    yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
-
-logging.info('翻譯完成！')
-sys.exit(0)
+# 寫入yaml文件
+# 保留原yaml文件的排列、斷行、縮進與註解
+with open(opath, 'w', encoding='utf-8') as f:
+    yaml.dump(content, f, allow_unicode=True)
