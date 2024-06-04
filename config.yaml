@@ -1,0 +1,4 @@
+# mpTranslate by SamHacker
+
+# 配置 Google Genimi API
+genai_api_key: "YOUR_GEMINI_API_TOKEN"
